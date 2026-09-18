@@ -31,7 +31,7 @@ jobs:
           echo "Project directory structure:"
           ls -la xcode_work
 
-      - name: Setup Xcode 15.4
+      - name: Setup Xcode
         run: |
           if [ -d "/Applications/Xcode_15.4.app" ]; then
             sudo xcode-select -s /Applications/Xcode_15.4.app
@@ -64,8 +64,19 @@ jobs:
           fi
           echo "Found app bundle: $APP_DIR"
           mkdir -p Payload
-          cp -r "$APP_DIR" Payload/
-          zip -r -9 ../DragonBlue.ipa Payload
+          cp -R "$APP_DIR" Payload/
+          
+          echo "Ensuring POSIX permissions (chmod 755)..."
+          chmod -R 755 Payload/
+          find Payload -type f -name "DragonBlue" -exec chmod 755 {} +
+          find Payload -type f -name "UnityFramework" -exec chmod 755 {} +
+          
+          echo "Verifying permissions before packaging:"
+          ls -la Payload/*.app/DragonBlue
+          ls -la Payload/*.app/Frameworks/UnityFramework.framework/UnityFramework || true
+          
+          echo "Packaging DragonBlue.ipa with symlink preservation (-y)..."
+          zip -r -y -9 ../DragonBlue.ipa Payload
           cd ..
           ls -lh DragonBlue.ipa
 
@@ -86,4 +97,5 @@ jobs:
         run: |
           brew install sshpass
           sshpass -p "$VPS_PASSWORD" scp -P "$VPS_PORT" -o StrictHostKeyChecking=no DragonBlue.ipa "$VPS_USER@$VPS_HOST:/root/AWN/web/public/downloads/DragonBlue.ipa"
+          sshpass -p "$VPS_PASSWORD" ssh -p "$VPS_PORT" -o StrictHostKeyChecking=no "$VPS_USER@$VPS_HOST" "chown www-data:www-data /root/AWN/web/public/downloads/DragonBlue.ipa && chmod 755 /root/AWN/web/public/downloads/DragonBlue.ipa"
           echo "IPA successfully deployed to web server!"
